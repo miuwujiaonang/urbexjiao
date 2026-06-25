@@ -1,12 +1,12 @@
 // ========== API 地址配置 ==========
-// 本地开发: 留空字符串即可(前端和后端同源, 走相对路径)
-// 部署上线: 改成你的 Render 后端域名(末尾不要加斜杠)
+// Vercel 部署: 前端和后端同源, 留空字符串即可(走相对路径)
+// 本地开发: 同样留空
 //
-// 示例:
-//   const API_BASE = 'https://ruins-explorer-api.onrender.com';
+// 如果前端和后端分开部署(比如前端在 Netlify, 后端在别处),
+// 才需要改成后端域名, 例如:
+//   const API_BASE = 'https://你的项目.vercel.app';
 //
 // 注意:
 //   1. 必须以 https:// 开头, 末尾不要带 /
-//   2. 后端部署成功后, Render 会给你一个类似 xxx.onrender.com 的域名
-//   3. 改完这个文件后, 重新把 public 文件夹上传到 Netlify
+//   2. 留空字符串时不要加引号外的空格
 const API_BASE = '';

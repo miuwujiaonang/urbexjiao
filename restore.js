@@ -2,7 +2,7 @@
 // 从 backup-YYYY-MM-DD-HHmmss 目录恢复数据到云端 PostgreSQL
 //
 // 用法(在废墟探索文件夹下运行):
-//   1. 设置环境变量 DATABASE_URL (从 Render 控制台 → PostgreSQL → External Database URL 复制)
+//   1. 设置环境变量 DATABASE_URL (从 Supabase 控制台 → Project Settings → Database → Connection string 复制)
 //      Windows PowerShell: $env:DATABASE_URL="postgresql://user:pass@host/db"
 //      Windows cmd:        set DATABASE_URL=postgresql://user:pass@host/db
 //   2. 运行:
@@ -19,7 +19,8 @@ const https = require('https');
 const http = require('http');
 
 // ====== 配置区(可改) ======
-const RENDER_URL = process.env.RENDER_URL || 'https://ruins-explorer-api.onrender.com';
+// 把下面这行的域名改成你 Vercel 部署完成后拿到的实际域名
+const SITE_URL = process.env.SITE_URL || 'https://urbexjiao.vercel.app';
 const ADMIN_USER = 'adurbex0626';
 const ADMIN_PASS = '06261228';
 // ===========================
@@ -172,7 +173,7 @@ async function main() {
 
         // 4.3 插入 images
         // 把相对路径 /uploads/xxx 转成绝对 URL, 让 Netlify 前端能跨域加载
-        const baseUrl = RENDER_URL.replace(/\/+$/, '');
+        const baseUrl = SITE_URL.replace(/\/+$/, '');
         for (const im of backup.data.images) {
             let filePath = im.file_path;
             if (filePath && filePath.startsWith('/')) {
@@ -214,7 +215,7 @@ async function main() {
                 console.log('    备份目录里没有 uploads 子目录, 跳过\n');
             } else {
                 // 登录
-                const baseUrl = RENDER_URL.replace(/\/+$/, '');
+                const baseUrl = SITE_URL.replace(/\/+$/, '');
                 const loginRes = await httpRequest(`${baseUrl}/api/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

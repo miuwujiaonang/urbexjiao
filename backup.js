@@ -1,8 +1,7 @@
 // ========== 一键备份脚本 ==========
 // 用法(在废墟探索文件夹下运行):
-//   node backup.js https://你的-render-域名.onrender.com
-//
-// 或者不传参数, 修改下面的 RENDER_URL 默认值
+//   node backup.js                              # 用下面的默认域名
+//   node backup.js https://你的-vercel-域名.vercel.app   # 命令行传参
 //
 // 备份结果:
 //   backup-YYYY-MM-DD-HHmmss/
@@ -17,7 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 // ====== 配置区(可改) ======
-const RENDER_URL = process.argv[2] || 'https://ruins-explorer-api.onrender.com';
+// 把下面这行的域名改成你 Vercel 部署完成后拿到的实际域名
+const SITE_URL = process.argv[2] || 'https://urbexjiao.vercel.app';
 const ADMIN_USER = 'adurbex0626';
 const ADMIN_PASS = '06261228';
 // ===========================
@@ -61,9 +61,9 @@ function downloadFile(url, destPath) {
 }
 
 async function main() {
-    const baseUrl = RENDER_URL.replace(/\/+$/, '');  // 去掉末尾斜杠
+    const baseUrl = SITE_URL.replace(/\/+$/, '');  // 去掉末尾斜杠
     console.log(`\n=== 废墟探索 - 一键备份 ===`);
-    console.log(`后端地址: ${baseUrl}\n`);
+    console.log(`网站地址: ${baseUrl}\n`);
 
     // 1. 登录获取 token
     console.log('[1/4] 登录管理员账号...');
