@@ -1,0 +1,27 @@
+# 需要 npm 安装的依赖
+node_modules/
+
+# 数据库文件(运行时自动创建, 不应打包)
+ruins.db
+ruins.db-shm
+ruins.db-wal
+
+# 上传的图片(运行时生成, 部署到 Render 后图片存在 Render 的临时磁盘上)
+uploads/
+
+# 日志和临时文件
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器配置
+.vscode/
+.idea/
+
+# 本地备份目录(运行 node backup.js 后生成)
+backup-*/
+backups/
+

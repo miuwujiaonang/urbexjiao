@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>废墟探索 - 废墟点位在线共享平台</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+    <!-- 顶栏 -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <h1 class="logo">🏚️ 废墟探索</h1>
+        </div>
+        <div class="topbar-center">
+            <input type="text" id="searchInput" placeholder="搜索废墟名称或描述..." class="search-input" />
+            <button id="searchBtn" class="btn btn-primary">搜索</button>
+        </div>
+        <div class="topbar-right" id="authArea">
+            <!-- 登录/注册/用户信息动态填充 -->
+        </div>
+    </header>
+
+    <!-- 主体 -->
+    <div class="main-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>筛选面板</h2>
+                <button class="btn-toggle-sidebar" id="toggleSidebar">◀</button>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- 地区筛选 -->
+                <div class="filter-group">
+                    <label>地区筛选</label>
+                    <select id="filterCountry" class="filter-select">
+                        <option value="">全部国家</option>
+                        <option value="中国">中国</option>
+                    </select>
+                    <select id="filterProvince" class="filter-select">
+                        <option value="">全部省份</option>
+                    </select>
+                    <select id="filterCity" class="filter-select">
+                        <option value="">全部城市</option>
+                    </select>
+                </div>
+
+                <!-- 类别筛选 -->
+                <div class="filter-group">
+                    <label>废墟类别</label>
+                    <select id="filterCategory" class="filter-select">
+                        <option value="">全部类别</option>
+                        <option value="废弃医院">废弃医院</option>
+                        <option value="废弃酒店">废弃酒店</option>
+                        <option value="废弃学校">废弃学校</option>
+                        <option value="废弃工厂">废弃工厂</option>
+                        <option value="废弃住宅">废弃住宅</option>
+                        <option value="废弃公园">废弃公园</option>
+                        <option value="废弃商场">废弃商场</option>
+                        <option value="废弃教堂">废弃教堂</option>
+                        <option value="废弃车站">废弃车站</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+
+                <!-- 保安/狗筛选 -->
+                <div class="filter-group">
+                    <label>安保情况</label>
+                    <div class="filter-radio">
+                        <label><input type="radio" name="security" value="" checked> 全部</label>
+                        <label><input type="radio" name="security" value="1"> 有</label>
+                        <label><input type="radio" name="security" value="0"> 无</label>
+                        <label><input type="radio" name="security" value="2"> 不确定</label>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>狗情况</label>
+                    <div class="filter-radio">
+                        <label><input type="radio" name="dogs" value="" checked> 全部</label>
+                        <label><input type="radio" name="dogs" value="1"> 有</label>
+                        <label><input type="radio" name="dogs" value="0"> 无</label>
+                        <label><input type="radio" name="dogs" value="2"> 不确定</label>
+                    </div>
+                </div>
+
+                <!-- 难度筛选 -->
+                <div class="filter-group">
+                    <label>进入难度</label>
+                    <select id="filterDifficulty" class="filter-select">
+                        <option value="">全部难度</option>
+                        <option value="1">★ (很容易)</option>
+                        <option value="2">★★ (较容易)</option>
+                        <option value="3">★★★ (中等)</option>
+                        <option value="4">★★★★ (较难)</option>
+                        <option value="5">★★★★★ (很难)</option>
+                    </select>
+                </div>
+
+                <button id="applyFilter" class="btn btn-primary btn-full">应用筛选</button>
+                <button id="resetFilter" class="btn btn-secondary btn-full">重置筛选</button>
+
+                <hr class="divider" />
+
+                <!-- 工具区 -->
+                <div class="filter-group">
+                    <label>地图工具</label>
+                    <button id="btnAddRuin" class="btn btn-accent btn-full">📍 上传废墟</button>
+                    <button id="btnMeasure" class="btn btn-tool btn-full">📏 测距工具</button>
+                    <button id="btnRoute" class="btn btn-tool btn-full">🧭 路线规划</button>
+                    <button id="btnMarkPoint" class="btn btn-tool btn-full">📌 打点标记</button>
+                </div>
+
+                <hr class="divider" />
+
+                <!-- 统计 -->
+                <div class="filter-group">
+                    <label>统计数据</label>
+                    <div id="stats" class="stats-box">加载中...</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 侧边栏收起时的展开按钮 -->
+        <button class="sidebar-expand" id="expandSidebar" style="display:none;">▶</button>
+
+        <!-- 地图区域 -->
+        <main class="map-area">
+            <div id="map"></div>
+            <!-- 底图切换 -->
+            <div class="basemap-switcher">
+                <button class="basemap-btn active" data-basemap="street">🗺️ 街道</button>
+                <button class="basemap-btn" data-basemap="satellite">🛰️ 卫星</button>
+                <button class="basemap-btn" data-basemap="terrain">⛰️ 地形</button>
+            </div>
+            <!-- 浮动上传废墟按钮 -->
+            <button class="fab-add-ruin" id="fabAddRuin" title="上传废墟">📍<span>上传废墟</span></button>
+            <!-- 浮动工具栏 -->
+            <div class="fab-toolbar">
+                <button class="fab-tool" id="fabMarkPoint" title="打点标记">📌</button>
+                <button class="fab-tool" id="fabMeasure" title="测距工具">📏</button>
+                <button class="fab-tool" id="fabRoute" title="路线规划">🧭</button>
+            </div>
+            <!-- 路线面板 -->
+            <div class="route-panel" id="routePanel" style="display:none;">
+                <h3>路线规划</h3>
+                <input type="text" id="routeStart" placeholder="起点（输入地址或点击地图）" class="route-input" />
+                <input type="text" id="routeEnd" placeholder="终点（输入地址或点击地图）" class="route-input" />
+                <button id="calcRoute" class="btn btn-primary btn-full">计算路线</button>
+                <button id="clearRoute" class="btn btn-secondary btn-full">清除路线</button>
+                <div id="routeInfo" class="route-info"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 登录/注册弹窗 -->
+    <div class="modal" id="authModal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" data-modal="authModal">&times;</span>
+            <h2 id="authModalTitle">登录</h2>
+            <form id="authForm">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="authUsername" required />
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="authPassword" required />
+                </div>
+                <div class="form-group" id="emailGroup" style="display:none;">
+                    <label>邮箱（选填）</label>
+                    <input type="email" id="authEmail" pattern="[^\s@]+@[^\s@]+\.[^\s@]+" title="请输入正确的邮箱格式，如 user@example.com" placeholder="user@example.com" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-full" id="authSubmit">登录</button>
+                <button type="button" class="btn btn-admin btn-full" id="adminLoginBtn" style="margin-top:8px;">🔐 管理员登录</button>
+                <p class="form-switch" id="authSwitch">没有账号？<a href="#" id="switchToRegister">注册</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 上传废墟弹窗 -->
+    <div class="modal" id="ruinModal" style="display:none;">
+        <div class="modal-content modal-large">
+            <span class="modal-close" data-modal="ruinModal">&times;</span>
+            <h2>上传废墟</h2>
+            <form id="ruinForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>废墟名称 <span class="required">*</span></label>
+                        <input type="text" id="ruinName" required placeholder="如：某某废弃工厂" />
+                    </div>
+                    <div class="form-group">
+                        <label>废墟类别 <span class="required">*</span></label>
+                        <select id="ruinCategory" required>
+                            <option value="">请选择</option>
+                            <option value="废弃医院">废弃医院</option>
+                            <option value="废弃酒店">废弃酒店</option>
+                            <option value="废弃学校">废弃学校</option>
+                            <option value="废弃工厂">废弃工厂</option>
+                            <option value="废弃住宅">废弃住宅</option>
+                            <option value="废弃公园">废弃公园</option>
+                            <option value="废弃商场">废弃商场</option>
+                            <option value="废弃教堂">废弃教堂</option>
+                            <option value="废弃车站">废弃车站</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>纬度 <span class="required">*</span></label>
+                        <input type="number" id="ruinLat" step="0.000001" required placeholder="如：23.1291" />
+                    </div>
+                    <div class="form-group">
+                        <label>经度 <span class="required">*</span></label>
+                        <input type="number" id="ruinLng" step="0.000001" required placeholder="如：113.2644" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>定位方式</label>
+                    <div class="btn-group">
+                        <button type="button" id="useGPS" class="btn btn-tool">📱 使用GPS定位</button>
+                        <button type="button" id="useMapClick" class="btn btn-tool">🗺️ 点击地图选择</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>废墟说明（选填）</label>
+                    <textarea id="ruinDescription" rows="3" placeholder="描述废墟的历史、现状等..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>上传图片（选填）</label>
+                    <input type="file" id="ruinImages" accept="image/*" multiple />
+                    <div id="imagePreview" class="image-preview"></div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>有保安</label>
+                        <select id="ruinSecurity">
+                            <option value="2">不确定</option>
+                            <option value="0">无</option>
+                            <option value="1">有</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>有狗</label>
+                        <select id="ruinDogs">
+                            <option value="2">不确定</option>
+                            <option value="0">无</option>
+                            <option value="1">有</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>进入难度</label>
+                    <div class="star-rating" id="ruinDifficulty">
+                        <span class="star" data-value="1">★</span>
+                        <span class="star" data-value="2">★</span>
+                        <span class="star" data-value="3">★</span>
+                        <span class="star" data-value="4">★</span>
+                        <span class="star" data-value="5">★</span>
+                    </div>
+                    <input type="hidden" id="ruinDifficultyValue" value="1" />
+                </div>
+
+                <div class="form-group">
+                    <label>路线说明（选填）</label>
+                    <textarea id="ruinRoute" rows="2" placeholder="描述进入路线..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>是否敏感</label>
+                        <select id="ruinSensitive">
+                            <option value="2">不确定</option>
+                            <option value="0">否</option>
+                            <option value="1">是</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>是否公开</label>
+                        <select id="ruinPublic">
+                            <option value="1">公开分享</option>
+                            <option value="0">仅自己可见</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>国家（选填）</label>
+                        <input type="text" id="ruinCountry" placeholder="如：中国" />
+                    </div>
+                    <div class="form-group">
+                        <label>省份（选填）</label>
+                        <input type="text" id="ruinProvince" placeholder="如：广东省" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>城市（选填）</label>
+                        <input type="text" id="ruinCity" placeholder="如：广州市" />
+                    </div>
+                    <div class="form-group">
+                        <label>区县（选填）</label>
+                        <input type="text" id="ruinDistrict" placeholder="如：天河区" />
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">提交废墟</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 废墟详情弹窗 -->
+    <div class="modal" id="detailModal" style="display:none;">
+        <div class="modal-content modal-large" id="detailContent">
+            <!-- 动态填充 -->
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 脚本 -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/ruins.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

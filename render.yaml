@@ -1,0 +1,35 @@
+# Render Blueprint 配置文件
+# 部署后端(Node.js API) + PostgreSQL 数据库
+# 在 Render 控制台 → New → Blueprint → 选择本仓库即可一键部署
+
+services:
+  # PostgreSQL 数据库
+  - type: pserv
+    name: ruins-db
+    plan: free
+    ipAllowList: []   # 允许所有 IP 连接(仅内部网络可达)
+
+  # Node.js 后端 Web 服务
+  - type: web
+    name: ruins-explorer-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/ruins
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0
+      # 数据库连接(自动注入同账号下 PostgreSQL 的内部连接串)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ruins-db
+          property: connectionString
+      # 公网访问 URL，上传图片时用于拼接绝对路径
+      # 部署完成后请把 value 改成实际分配的域名(例如 https://ruins-explorer-api.onrender.com)
+      - key: PUBLIC_BASE_URL
+        value: https://ruins-explorer-api.onrender.com
+      # JWT 密钥(可自定义)
+      - key: JWT_SECRET
+        generateValue: true
