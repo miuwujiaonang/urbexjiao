@@ -543,8 +543,7 @@ const App = {
             </div>
         ` : '';
 
-        // 用 == 宽松比较, 因为 JWT 解出的 id 是数字, 数据库返回的可能是字符串
-        const isOwner = Auth.isLoggedIn() && (Auth.user.id == ruin.user_id);
+        const isOwner = Auth.isLoggedIn() && Auth.user.id === ruin.user_id;
         const canManage = Auth.isLoggedIn() && (Auth.isAdmin() || isOwner);
 
         content.innerHTML = `
