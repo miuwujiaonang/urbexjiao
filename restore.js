@@ -19,8 +19,8 @@ const https = require('https');
 const http = require('http');
 
 // ====== 配置区(可改) ======
-// 把下面这行的域名改成你 Vercel 部署完成后拿到的实际域名
-const SITE_URL = process.env.SITE_URL || 'https://urbexjiao.vercel.app';
+// 把下面这行的域名改成你 Netlify 部署完成后拿到的实际域名
+const SITE_URL = process.env.SITE_URL || 'https://urbexjiao.netlify.app';
 const ADMIN_USER = 'adurbex0626';
 const ADMIN_PASS = '06261228';
 // ===========================

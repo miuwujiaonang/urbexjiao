@@ -42,14 +42,12 @@ app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/admin', require('./routes/admin'));
 
-// 所有其他路由返回首页(SPA 回退)
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// 本地开发时启动服务器
-// Vercel 部署时不会执行这里(由 api/index.js 导出 app)
+// 本地开发模式: 启动服务器 + SPA 回退
+// Netlify 部署时不会执行这里(由 netlify/functions/api.js 导出 app)
 if (require.main === module) {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
     app.listen(PORT, () => {
         console.log(`废墟探索服务器已启动: http://localhost:${PORT}`);
         console.log(`提示: 首次运行请先在 Supabase 控制台执行 db/schema.sql`);

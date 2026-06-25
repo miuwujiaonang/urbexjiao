@@ -1,7 +1,7 @@
 // ========== 一键备份脚本 ==========
 // 用法(在废墟探索文件夹下运行):
 //   node backup.js                              # 用下面的默认域名
-//   node backup.js https://你的-vercel-域名.vercel.app   # 命令行传参
+//   node backup.js https://你的-netlify-域名.netlify.app   # 命令行传参
 //
 // 备份结果:
 //   backup-YYYY-MM-DD-HHmmss/
@@ -16,8 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 // ====== 配置区(可改) ======
-// 把下面这行的域名改成你 Vercel 部署完成后拿到的实际域名
-const SITE_URL = process.argv[2] || 'https://urbexjiao.vercel.app';
+// 把下面这行的域名改成你 Netlify 部署完成后拿到的实际域名
+const SITE_URL = process.argv[2] || 'https://urbexjiao.netlify.app';
 const ADMIN_USER = 'adurbex0626';
 const ADMIN_PASS = '06261228';
 // ===========================
