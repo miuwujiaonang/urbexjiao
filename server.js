@@ -14,15 +14,39 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // 初始化 PostgreSQL 连接池
-// Vercel 部署时从环境变量读取 DATABASE_URL
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-    // Supabase 推荐配置: 减少连接数, 避免超出免费版限制
-    max: 3,
-    idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 10000
-});
+// Netlify 部署时从环境变量读取连接信息
+// 使用显式参数避免 pg 库对连接串的用户名解析问题
+function createPool() {
+    const dbUrl = process.env.DATABASE_URL;
+    if (dbUrl) {
+        try {
+            const url = new URL(dbUrl);
+            return new Pool({
+                user: decodeURIComponent(url.username),
+                password: decodeURIComponent(url.password),
+                host: url.hostname,
+                port: parseInt(url.port) || 5432,
+                database: url.pathname.replace(/^\//, '') || 'postgres',
+                ssl: { rejectUnauthorized: false },
+                max: 3,
+                idleTimeoutMillis: 10000,
+                connectionTimeoutMillis: 15000
+            });
+        } catch (e) {
+            console.error('DATABASE_URL 解析失败, 退回 connectionString:', e.message);
+        }
+    }
+    // 本地开发模式: 用默认配置
+    return new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: false,
+        max: 3,
+        idleTimeoutMillis: 10000,
+        connectionTimeoutMillis: 10000
+    });
+}
+
+const pool = createPool();
 
 // 中间件
 app.use(cors());
