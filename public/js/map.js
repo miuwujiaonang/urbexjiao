@@ -338,8 +338,9 @@ const MapModule = {
             '其他': '🏚️'
         };
         const icon = categoryIcons[ruin.category] || '🏚️';
-        const stars = '★'.repeat(ruin.difficulty) + '☆'.repeat(5 - ruin.difficulty);
-        const rating = ruin.avg_rating ? ruin.avg_rating.toFixed(1) : '暂无';
+        const diff = parseInt(ruin.difficulty) || 1;
+        const stars = '★'.repeat(diff) + '☆'.repeat(5 - diff);
+        const rating = ruin.avg_rating ? Number(ruin.avg_rating).toFixed(1) : '暂无';
         const coverImg = ruin.cover_image ? `<img src="${ruin.cover_image}" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin:6px 0;" />` : '';
 
         const marker = L.marker([ruin.latitude, ruin.longitude]).addTo(this.markers);

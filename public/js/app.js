@@ -483,8 +483,9 @@ const App = {
     renderDetail(ruin, reviews) {
         const modal = document.getElementById('detailModal');
         const content = document.getElementById('detailContent');
-        const stars = '★'.repeat(ruin.difficulty) + '☆'.repeat(5 - ruin.difficulty);
-        const rating = ruin.avg_rating ? ruin.avg_rating.toFixed(1) : '暂无';
+        const diff = parseInt(ruin.difficulty) || 1;
+        const stars = '★'.repeat(diff) + '☆'.repeat(5 - diff);
+        const rating = ruin.avg_rating ? Number(ruin.avg_rating).toFixed(1) : '暂无';
 
         let imagesHtml = '';
         if (ruin.images && ruin.images.length > 0) {
