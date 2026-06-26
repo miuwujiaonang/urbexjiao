@@ -3,6 +3,7 @@
 const App = {
     uploadedImagePaths: [],  // 上传废墟时已上传的图片路径
     selectedDifficulty: 1,
+    csvImportItems: [],      // CSV 批量导入数据列表
 
     // 初始化
     async init() {
@@ -44,10 +45,60 @@ const App = {
 
     // 绑定所有事件
     bindEvents() {
-        // 搜索
-        document.getElementById('searchBtn').addEventListener('click', () => this.applyFilters());
+        // 搜索模式切换
+        document.querySelectorAll('.search-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const mode = tab.dataset.mode;
+                const input = document.getElementById('searchInput');
+                if (mode === 'ruins') {
+                    input.placeholder = '搜索废墟名称或描述...';
+                    document.getElementById('placeSuggestions').style.display = 'none';
+                } else {
+                    input.placeholder = '搜索任意地点(如: 北京 故宫)...';
+                }
+                input.value = '';
+            });
+        });
+
+        // 搜索按钮
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const mode = document.querySelector('.search-tab.active').dataset.mode;
+            if (mode === 'place') {
+                this.searchPlace();
+            } else {
+                this.applyFilters();
+            }
+        });
         document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.applyFilters();
+            if (e.key !== 'Enter') return;
+            const mode = document.querySelector('.search-tab.active').dataset.mode;
+            if (mode === 'place') {
+                this.searchPlace();
+            } else {
+                this.applyFilters();
+            }
+        });
+
+        // 地点搜索实时建议
+        let placeTimer = null;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const mode = document.querySelector('.search-tab.active').dataset.mode;
+            if (mode !== 'place') return;
+            clearTimeout(placeTimer);
+            const val = e.target.value.trim();
+            if (val.length < 2) {
+                document.getElementById('placeSuggestions').style.display = 'none';
+                return;
+            }
+            placeTimer = setTimeout(() => this.searchPlaceSuggestions(val), 400);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.topbar-center')) {
+                document.getElementById('placeSuggestions').style.display = 'none';
+            }
         });
 
         // 筛选
@@ -65,6 +116,17 @@ const App = {
         document.getElementById('btnRoute').addEventListener('click', () => this.toggleTool('route'));
         document.getElementById('btnMarkPoint').addEventListener('click', () => this.toggleTool('mark'));
         document.getElementById('btnClearMarks').addEventListener('click', () => MapModule.clearClickMarkers());
+
+        // CSV 批量导入
+        document.getElementById('btnCsvImport').addEventListener('click', () => this.openCsvImport());
+        document.getElementById('csvParseBtn').addEventListener('click', () => this.handleCsvParse());
+        document.getElementById('csvDownloadTemplate').addEventListener('click', () => this.downloadCsvTemplate());
+        document.getElementById('csvUploadAll').addEventListener('click', () => this.uploadAllCsv());
+        document.getElementById('csvClearAll').addEventListener('click', () => {
+            this.csvImportItems = [];
+            this.renderCsvList();
+            document.getElementById('csvListSection').style.display = 'none';
+        });
 
         // 浮动按钮(地图上)
         document.getElementById('fabAddRuin').addEventListener('click', () => this.openRuinModal());
@@ -234,6 +296,66 @@ const App = {
         this.toast('请输入管理员账号和密码', 'success');
     },
 
+    // === 地点搜索(Nominatim) ===
+    async searchPlace() {
+        const input = document.getElementById('searchInput');
+        const val = input.value.trim();
+        if (val.length < 2) {
+            this.toast('请输入至少2个字符', 'error');
+            return;
+        }
+        const suggest = document.getElementById('placeSuggestions');
+        suggest.innerHTML = '<div style="padding:8px;color:#999;">搜索中...</div>';
+        suggest.style.display = 'block';
+        try {
+            const places = await MapModule.searchPlaces(val);
+            if (places.length === 0) {
+                suggest.innerHTML = '<div style="padding:8px;color:#999;">未找到地点</div>';
+                return;
+            }
+            this.renderPlaceSuggestions(places);
+        } catch (e) {
+            suggest.innerHTML = '<div style="padding:8px;color:#e74c3c;">搜索失败</div>';
+        }
+    },
+
+    async searchPlaceSuggestions(val) {
+        const suggest = document.getElementById('placeSuggestions');
+        try {
+            const places = await MapModule.searchPlaces(val);
+            if (places.length === 0) {
+                suggest.innerHTML = '';
+                suggest.style.display = 'none';
+                return;
+            }
+            this.renderPlaceSuggestions(places);
+        } catch (e) {
+            console.error('地点建议失败:', e);
+        }
+    },
+
+    // 渲染地点建议列表
+    renderPlaceSuggestions(places) {
+        const suggest = document.getElementById('placeSuggestions');
+        suggest.innerHTML = places.map((p, i) => `
+            <div class="place-suggestion-item" data-idx="${i}">
+                <div class="place-name">${p.shortName}</div>
+                <div class="place-addr">${p.name}</div>
+            </div>
+        `).join('');
+        suggest.style.display = 'block';
+        suggest.querySelectorAll('.place-suggestion-item').forEach((item, i) => {
+            item.addEventListener('click', () => {
+                const place = places[i];
+                MapModule.flyTo(place.lat, place.lng, 14);
+                MapModule.addPlaceMarker(place.lat, place.lng, place.shortName);
+                suggest.style.display = 'none';
+                document.getElementById('searchInput').value = place.shortName;
+                this.toast(`已定位到: ${place.shortName}`, 'success');
+            });
+        });
+    },
+
     // === 筛选 ===
     applyFilters() {
         const filters = {
@@ -332,6 +454,7 @@ const App = {
             province: document.getElementById('ruinProvince').value.trim(),
             city: document.getElementById('ruinCity').value.trim(),
             district: document.getElementById('ruinDistrict').value.trim(),
+            external_link: document.getElementById('ruinExternalLink').value.trim(),
         };
 
         try {
@@ -430,22 +553,38 @@ const App = {
         const preview = document.getElementById('imagePreview');
         for (const file of files) {
             try {
-                // 预览
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const img = document.createElement('img');
-                    img.src = ev.target.result;
-                    preview.appendChild(img);
-                };
-                reader.readAsDataURL(file);
-
                 // 上传
                 const path = await Ruins.uploadImage(file);
+                const idx = this.uploadedImagePaths.length;
                 this.uploadedImagePaths.push({ path, description: '' });
+
+                // 预览 + 删除按钮
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'image-preview-item';
+                    wrapper.dataset.idx = idx;
+                    wrapper.innerHTML = `
+                        <img src="${ev.target.result}" />
+                        <button type="button" class="image-preview-remove" title="删除">&times;</button>
+                    `;
+                    wrapper.querySelector('.image-preview-remove').addEventListener('click', () => {
+                        // 从已上传列表移除(用 path 匹配, 避免索引错乱)
+                        const removePath = wrapper.dataset.path;
+                        this.uploadedImagePaths = this.uploadedImagePaths.filter(p => p.path !== removePath);
+                        wrapper.remove();
+                    });
+                    // 上传成功后把 path 存到 wrapper 上, 方便后续删除
+                    wrapper.dataset.path = path;
+                    preview.appendChild(wrapper);
+                };
+                reader.readAsDataURL(file);
             } catch (err) {
                 this.toast('图片上传失败: ' + err.message, 'error');
             }
         }
+        // 清空 input, 允许再次选择同一文件
+        e.target.value = '';
     },
 
     // 星级评分
@@ -602,6 +741,13 @@ const App = {
             </div>
             ` : ''}
 
+            ${ruin.external_link ? `
+            <div class="detail-section">
+                <h3>外链附件</h3>
+                <a href="${ruin.external_link}" target="_blank" rel="noopener noreferrer" class="detail-link">🔗 ${ruin.external_link}</a>
+            </div>
+            ` : ''}
+
             <div class="detail-section">
                 <h3>图片</h3>
                 ${imagesHtml}
@@ -717,6 +863,7 @@ const App = {
             document.getElementById('ruinDogs').value = ruin.has_dogs;
             this.setDifficulty(ruin.difficulty);
             document.getElementById('ruinRoute').value = ruin.route || '';
+            document.getElementById('ruinExternalLink').value = ruin.external_link || '';
             document.getElementById('ruinSensitive').value = ruin.is_sensitive;
             document.getElementById('ruinPublic').value = ruin.is_public;
             document.getElementById('ruinCountry').value = ruin.country || '';
@@ -746,6 +893,325 @@ const App = {
             expandBtn.style.display = 'block';
         }
         setTimeout(() => MapModule.map.invalidateSize(), 300);
+    },
+
+    // === CSV 批量导入 ===
+
+    // 打开 CSV 导入弹窗
+    openCsvImport() {
+        if (!Auth.isLoggedIn()) {
+            this.toast('请先登录', 'error');
+            this.openAuthModal('login');
+            return;
+        }
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('csvListSection').style.display = 'none';
+        document.getElementById('csvImportList').innerHTML = '';
+        this.csvImportItems = [];
+        document.getElementById('csvImportModal').style.display = 'flex';
+    },
+
+    // 简单 CSV 解析(支持引号包裹和转义双引号)
+    parseCSV(text) {
+        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+        if (lines.length < 2) return { headers: [], rows: [] };
+
+        const parseLine = (line) => {
+            const result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (line[i + 1] === '"') { cur += '"'; i++; }
+                        else inQuotes = false;
+                    } else cur += ch;
+                } else {
+                    if (ch === '"') inQuotes = true;
+                    else if (ch === ',') { result.push(cur); cur = ''; }
+                    else cur += ch;
+                }
+            }
+            result.push(cur);
+            return result.map(s => s.trim());
+        };
+
+        const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim());
+        const rows = lines.slice(1).map(parseLine);
+        return { headers, rows };
+    },
+
+    // 解析选中的 CSV 文件
+    async handleCsvParse() {
+        const fileInput = document.getElementById('csvFileInput');
+        if (!fileInput.files.length) {
+            this.toast('请先选择 CSV 文件', 'error');
+            return;
+        }
+        const file = fileInput.files[0];
+        const text = await file.text();
+        const { headers, rows } = this.parseCSV(text);
+
+        if (headers.length === 0 || rows.length === 0) {
+            this.toast('CSV 文件为空或格式错误', 'error');
+            return;
+        }
+
+        // 表头字段映射(支持中英文)
+        const fieldMap = {
+            'name': 'name', '名称': 'name', '废墟名称': 'name',
+            'category': 'category', '类别': 'category', '废墟类别': 'category',
+            'latitude': 'latitude', 'lat': 'latitude', '纬度': 'latitude',
+            'longitude': 'longitude', 'lng': 'longitude', 'lon': 'longitude', '经度': 'longitude',
+            'description': 'description', '说明': 'description', '描述': 'description',
+            'has_security': 'has_security', '保安': 'has_security', '有保安': 'has_security',
+            'has_dogs': 'has_dogs', '狗': 'has_dogs', '有狗': 'has_dogs',
+            'difficulty': 'difficulty', '难度': 'difficulty',
+            'route': 'route', '路线': 'route',
+            'is_sensitive': 'is_sensitive', '敏感': 'is_sensitive',
+            'is_public': 'is_public', '公开': 'is_public',
+            'country': 'country', '国家': 'country',
+            'province': 'province', '省份': 'province',
+            'city': 'city', '城市': 'city',
+            'district': 'district', '区县': 'district',
+            'external_link': 'external_link', '外链': 'external_link', '链接': 'external_link'
+        };
+
+        this.csvImportItems = rows.map((row, idx) => {
+            const obj = { _idx: idx, _status: 'pending', _error: '' };
+            headers.forEach((h, i) => {
+                const key = fieldMap[h] || h;
+                obj[key] = row[i] !== undefined ? row[i] : '';
+            });
+            return obj;
+        });
+
+        this.renderCsvList();
+        document.getElementById('csvListSection').style.display = 'block';
+        this.toast(`解析完成，共 ${this.csvImportItems.length} 条数据`, 'success');
+    },
+
+    // HTML 转义
+    escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    },
+
+    // 渲染 CSV 列表(每条可编辑)
+    renderCsvList() {
+        const list = document.getElementById('csvImportList');
+        const stats = document.getElementById('csvStats');
+        const success = this.csvImportItems.filter(i => i._status === 'ok').length;
+        const failed = this.csvImportItems.filter(i => i._status === 'error').length;
+        const pending = this.csvImportItems.filter(i => i._status === 'pending').length;
+        stats.textContent = `共 ${this.csvImportItems.length} 条 | 成功 ${success} | 失败 ${failed} | 待上传 ${pending}`;
+
+        const categories = ['废弃医院', '废弃酒店', '废弃学校', '废弃工厂', '废弃住宅', '废弃公园', '废弃商场', '废弃教堂', '废弃车站', '其他'];
+
+        list.innerHTML = this.csvImportItems.map((item, idx) => {
+            const statusClass = `status-${item._status}`;
+            const statusText = item._status === 'pending' ? '待上传' : (item._status === 'ok' ? '已上传' : '失败');
+            return `
+                <div class="csv-import-item">
+                    <div class="csv-item-header">
+                        <strong>#${idx + 1}</strong>
+                        <span class="csv-item-status ${statusClass}">${statusText}</span>
+                    </div>
+                    ${item._error ? `<div style="color:#e74c3c;font-size:11px;margin-bottom:4px;">${this.escapeHtml(item._error)}</div>` : ''}
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>名称 *</label>
+                            <input type="text" data-idx="${idx}" data-field="name" value="${this.escapeHtml(item.name)}" />
+                        </div>
+                        <div class="form-group">
+                            <label>类别 *</label>
+                            <select data-idx="${idx}" data-field="category">
+                                ${categories.map(c => `<option value="${c}" ${item.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>纬度 *</label>
+                            <input type="number" step="0.000001" data-idx="${idx}" data-field="latitude" value="${this.escapeHtml(item.latitude)}" />
+                        </div>
+                        <div class="form-group">
+                            <label>经度 *</label>
+                            <input type="number" step="0.000001" data-idx="${idx}" data-field="longitude" value="${this.escapeHtml(item.longitude)}" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>说明</label>
+                        <input type="text" data-idx="${idx}" data-field="description" value="${this.escapeHtml(item.description)}" />
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>保安</label>
+                            <select data-idx="${idx}" data-field="has_security">
+                                <option value="2" ${item.has_security == 2 ? 'selected' : ''}>不确定</option>
+                                <option value="0" ${item.has_security == 0 ? 'selected' : ''}>无</option>
+                                <option value="1" ${item.has_security == 1 ? 'selected' : ''}>有</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>狗</label>
+                            <select data-idx="${idx}" data-field="has_dogs">
+                                <option value="2" ${item.has_dogs == 2 ? 'selected' : ''}>不确定</option>
+                                <option value="0" ${item.has_dogs == 0 ? 'selected' : ''}>无</option>
+                                <option value="1" ${item.has_dogs == 1 ? 'selected' : ''}>有</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>难度</label>
+                            <select data-idx="${idx}" data-field="difficulty">
+                                ${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${item.difficulty == d ? 'selected' : ''}>${'★'.repeat(d)}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>路线</label>
+                        <input type="text" data-idx="${idx}" data-field="route" value="${this.escapeHtml(item.route)}" />
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>敏感</label>
+                            <select data-idx="${idx}" data-field="is_sensitive">
+                                <option value="2" ${item.is_sensitive == 2 ? 'selected' : ''}>不确定</option>
+                                <option value="0" ${item.is_sensitive == 0 ? 'selected' : ''}>否</option>
+                                <option value="1" ${item.is_sensitive == 1 ? 'selected' : ''}>是</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>公开</label>
+                            <select data-idx="${idx}" data-field="is_public">
+                                <option value="1" ${item.is_public != 0 ? 'selected' : ''}>公开</option>
+                                <option value="0" ${item.is_public == 0 ? 'selected' : ''}>仅自己</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>国家</label>
+                            <input type="text" data-idx="${idx}" data-field="country" value="${this.escapeHtml(item.country)}" />
+                        </div>
+                        <div class="form-group">
+                            <label>省份</label>
+                            <input type="text" data-idx="${idx}" data-field="province" value="${this.escapeHtml(item.province)}" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>城市</label>
+                            <input type="text" data-idx="${idx}" data-field="city" value="${this.escapeHtml(item.city)}" />
+                        </div>
+                        <div class="form-group">
+                            <label>区县</label>
+                            <input type="text" data-idx="${idx}" data-field="district" value="${this.escapeHtml(item.district)}" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>外链</label>
+                        <input type="url" data-idx="${idx}" data-field="external_link" value="${this.escapeHtml(item.external_link)}" />
+                    </div>
+                    <button type="button" class="btn btn-primary btn-full" onclick="App.uploadCsvItem(${idx})">上传此条</button>
+                </div>
+            `;
+        }).join('');
+
+        // 绑定字段变更事件
+        list.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('change', () => {
+                const idx = parseInt(el.dataset.idx);
+                const field = el.dataset.field;
+                if (this.csvImportItems[idx]) {
+                    this.csvImportItems[idx][field] = el.value;
+                }
+            });
+        });
+    },
+
+    // 上传单条 CSV 数据
+    async uploadCsvItem(idx) {
+        const item = this.csvImportItems[idx];
+        if (!item) return;
+
+        // 验证必填
+        if (!item.name || !item.category || item.latitude === '' || item.longitude === '' || item.latitude == null || item.longitude == null) {
+            item._status = 'error';
+            item._error = '名称、类别、纬度、经度不能为空';
+            this.renderCsvList();
+            this.toast(`#${idx + 1} 请填写必填字段`, 'error');
+            return;
+        }
+
+        const data = {
+            name: item.name,
+            category: item.category,
+            latitude: parseFloat(item.latitude),
+            longitude: parseFloat(item.longitude),
+            description: item.description || '',
+            has_security: parseInt(item.has_security) || 2,
+            has_dogs: parseInt(item.has_dogs) || 2,
+            difficulty: parseInt(item.difficulty) || 1,
+            route: item.route || '',
+            is_sensitive: parseInt(item.is_sensitive) || 2,
+            is_public: item.is_public !== '0' && item.is_public !== 0,
+            country: item.country || '',
+            province: item.province || '',
+            city: item.city || '',
+            district: item.district || '',
+            external_link: item.external_link || '',
+        };
+
+        try {
+            await Ruins.create(data);
+            item._status = 'ok';
+            item._error = '';
+            this.renderCsvList();
+            this.toast(`#${idx + 1} 上传成功`, 'success');
+            await this.loadRuins();
+        } catch (err) {
+            item._status = 'error';
+            item._error = err.message;
+            this.renderCsvList();
+            this.toast(`#${idx + 1} 上传失败: ${err.message}`, 'error');
+        }
+    },
+
+    // 批量上传所有待上传数据
+    async uploadAllCsv() {
+        const pending = this.csvImportItems.filter(i => i._status === 'pending');
+        if (pending.length === 0) {
+            this.toast('没有待上传的数据', 'error');
+            return;
+        }
+        this.toast(`开始上传 ${pending.length} 条数据...`, 'success');
+        for (const item of pending) {
+            await this.uploadCsvItem(item._idx);
+        }
+        const failed = this.csvImportItems.filter(i => i._status === 'error').length;
+        if (failed === 0) {
+            this.toast('全部上传完成', 'success');
+        } else {
+            this.toast(`上传完成，${failed} 条失败，请检查后重试`, 'error');
+        }
+    },
+
+    // 下载 CSV 模板
+    downloadCsvTemplate() {
+        const headers = 'name,category,latitude,longitude,description,has_security,has_dogs,difficulty,route,is_sensitive,is_public,country,province,city,district,external_link';
+        const example = '示例废弃工厂,废弃工厂,23.1291,113.2644,一个老工厂,2,2,3,从东门进入,0,1,中国,广东省,广州市,天河区,https://example.com';
+        const csv = '\uFEFF' + headers + '\n' + example;  // BOM 防止 Excel 中文乱码
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '废墟导入模板.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast('模板已下载', 'success');
     },
 
     // === Toast 提示 ===

@@ -77,7 +77,7 @@ router.get('/:id', async (req, res) => {
 // 创建废墟
 router.post('/', auth, async (req, res) => {
     const db = req.app.locals.db;
-    const { name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district } = req.body;
+    const { name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district, external_link } = req.body;
 
     if (!name || !category || longitude === undefined || latitude === undefined) {
         return res.status(400).json({ error: '名称、类别和经纬度不能为空' });
@@ -85,13 +85,14 @@ router.post('/', auth, async (req, res) => {
 
     try {
         const result = await db.query(`
-            INSERT INTO ruins (user_id, name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            INSERT INTO ruins (user_id, name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district, external_link)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING id
         `, [req.user.id, name, category, longitude, latitude, description || null,
             triState(has_security), triState(has_dogs), difficulty || 1, route || null,
             triState(is_sensitive), is_public !== false ? 1 : 0,
-            country || null, province || null, city || null, district || null]);
+            country || null, province || null, city || null, district || null,
+            external_link || null]);
 
         res.json({ id: result.rows[0].id, message: '废墟创建成功' });
     } catch (err) {
@@ -109,15 +110,16 @@ router.put('/:id', auth, async (req, res) => {
         const ruin = ruinResult.rows[0];
         if (!req.user.is_admin && ruin.user_id !== req.user.id) return res.status(403).json({ error: '无权修改' });
 
-        const { name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district } = req.body;
+        const { name, category, longitude, latitude, description, has_security, has_dogs, difficulty, route, is_sensitive, is_public, country, province, city, district, external_link } = req.body;
 
         await db.query(`
             UPDATE ruins SET
                 name = $1, category = $2, longitude = $3, latitude = $4, description = $5,
                 has_security = $6, has_dogs = $7, difficulty = $8, route = $9, is_sensitive = $10,
                 is_public = $11, country = $12, province = $13, city = $14, district = $15,
+                external_link = $16,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $16
+            WHERE id = $17
         `, [name || ruin.name, category || ruin.category,
             longitude !== undefined ? longitude : ruin.longitude,
             latitude !== undefined ? latitude : ruin.latitude,
@@ -129,6 +131,7 @@ router.put('/:id', auth, async (req, res) => {
             province !== undefined ? province : ruin.province,
             city !== undefined ? city : ruin.city,
             district !== undefined ? district : ruin.district,
+            external_link !== undefined ? (external_link || null) : ruin.external_link,
             req.params.id]);
 
         res.json({ message: '更新成功' });

@@ -15,8 +15,13 @@
             <h1 class="logo">🏚️ 废墟探索</h1>
         </div>
         <div class="topbar-center">
-            <input type="text" id="searchInput" placeholder="搜索废墟名称或描述..." class="search-input" />
+            <div class="search-tabs">
+                <button class="search-tab active" data-mode="ruins">搜废墟</button>
+                <button class="search-tab" data-mode="place">搜地点</button>
+            </div>
+            <input type="text" id="searchInput" placeholder="搜索废墟名称或描述..." class="search-input" autocomplete="off" />
             <button id="searchBtn" class="btn btn-primary">搜索</button>
+            <div class="place-suggestions" id="placeSuggestions"></div>
         </div>
         <div class="topbar-right" id="authArea">
             <!-- 登录/注册/用户信息动态填充 -->
@@ -109,6 +114,7 @@
                 <div class="filter-group">
                     <label>地图工具</label>
                     <button id="btnAddRuin" class="btn btn-accent btn-full">📍 上传废墟</button>
+                    <button id="btnCsvImport" class="btn btn-tool btn-full">📥 批量导入(CSV)</button>
                     <button id="btnMeasure" class="btn btn-tool btn-full">📏 测距工具</button>
                     <button id="btnRoute" class="btn btn-tool btn-full">🧭 路线规划</button>
                     <button id="btnMarkPoint" class="btn btn-tool btn-full">📌 打点标记</button>
@@ -148,8 +154,14 @@
             <!-- 路线面板 -->
             <div class="route-panel" id="routePanel" style="display:none;">
                 <h3>路线规划</h3>
-                <input type="text" id="routeStart" placeholder="起点（输入地址或点击地图）" class="route-input" />
-                <input type="text" id="routeEnd" placeholder="终点（输入地址或点击地图）" class="route-input" />
+                <div class="route-search-wrap">
+                    <input type="text" id="routeStart" placeholder="起点（输入地址搜索或点击地图）" class="route-input" autocomplete="off" />
+                    <div class="route-suggestions" id="routeStartSuggestions"></div>
+                </div>
+                <div class="route-search-wrap">
+                    <input type="text" id="routeEnd" placeholder="终点（输入地址搜索或点击地图）" class="route-input" autocomplete="off" />
+                    <div class="route-suggestions" id="routeEndSuggestions"></div>
+                </div>
                 <button id="calcRoute" class="btn btn-primary btn-full">计算路线</button>
                 <button id="clearRoute" class="btn btn-secondary btn-full">清除路线</button>
                 <div id="routeInfo" class="route-info"></div>
@@ -277,6 +289,11 @@
                     <textarea id="ruinRoute" rows="2" placeholder="描述进入路线..."></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label>外链附件（选填）</label>
+                    <input type="url" id="ruinExternalLink" placeholder="https:// 相关网页链接，如详细攻略、视频等" />
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label>是否敏感</label>
@@ -325,6 +342,40 @@
     <div class="modal" id="detailModal" style="display:none;">
         <div class="modal-content modal-large" id="detailContent">
             <!-- 动态填充 -->
+        </div>
+    </div>
+
+    <!-- CSV 批量导入弹窗 -->
+    <div class="modal" id="csvImportModal" style="display:none;">
+        <div class="modal-content modal-large">
+            <span class="modal-close" data-modal="csvImportModal">&times;</span>
+            <h2>批量导入点位</h2>
+
+            <div class="csv-import-section">
+                <h3>第一步：选择 CSV 文件</h3>
+                <input type="file" id="csvFileInput" accept=".csv" />
+                <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary" id="csvDownloadTemplate">📥 下载模板</button>
+                    <button type="button" class="btn btn-primary" id="csvParseBtn">解析文件</button>
+                </div>
+                <div style="margin-top:8px; font-size:12px; color:#999; line-height:1.7;">
+                    CSV 表头(支持中英文)：<code>name,category,latitude,longitude,description,has_security,has_dogs,difficulty,route,is_sensitive,is_public,country,province,city,district,external_link</code><br>
+                    必填字段：name(名称)、category(类别)、latitude(纬度)、longitude(经度)<br>
+                    三态字段(保安/狗/敏感)：0=无 / 1=有 / 2=不确定<br>
+                    公开字段(is_public)：1=公开 / 0=仅自己<br>
+                    难度(difficulty)：1~5
+                </div>
+            </div>
+
+            <div class="csv-import-section" id="csvListSection" style="display:none;">
+                <h3>第二步：编辑并上传</h3>
+                <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+                    <button type="button" class="btn btn-success" id="csvUploadAll">✅ 全部上传</button>
+                    <button type="button" class="btn btn-secondary" id="csvClearAll">🗑️ 清空列表</button>
+                    <span id="csvStats" style="font-size:12px; color:#999;"></span>
+                </div>
+                <div class="csv-import-list" id="csvImportList"></div>
+            </div>
         </div>
     </div>
 

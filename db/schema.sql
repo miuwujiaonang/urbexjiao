@@ -32,10 +32,23 @@ CREATE TABLE IF NOT EXISTS ruins (
     province TEXT,
     city TEXT,
     district TEXT,
+    external_link TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- 已有库升级: 若 ruins 表无 external_link 列则添加
+-- 在 Supabase SQL Editor 中执行一次即可
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'ruins' AND column_name = 'external_link'
+    ) THEN
+        ALTER TABLE ruins ADD COLUMN external_link TEXT;
+    END IF;
+END $$;
 
 -- 图片表
 CREATE TABLE IF NOT EXISTS images (

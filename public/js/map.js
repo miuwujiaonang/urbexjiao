@@ -18,17 +18,18 @@ const MapModule = {
 
     // 初始化地图
     init() {
-        // 三种底图
-        this.basemaps.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
+        // 三种底图(全部使用 Esri 服务, 国内访问稳定)
+        // 之前 OSM/OpenTopoMap 域名在国内手机网络下被墙, 导致瓦片加载不出来
+        this.basemaps.street = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri',
             maxZoom: 19
         });
         this.basemaps.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '© Esri',
             maxZoom: 19
         });
-        this.basemaps.terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenTopoMap',
+        this.basemaps.terrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri',
             maxZoom: 17
         });
 
@@ -52,6 +53,10 @@ const MapModule = {
 
         // 地图点击事件
         this.map.on('click', (e) => this.onMapClick(e));
+
+        // 绑定路线起终点地址搜索
+        this.bindRouteSearch('routeStart', 'routeStartSuggestions', true);
+        this.bindRouteSearch('routeEnd', 'routeEndSuggestions', false);
     },
 
     // 切换底图
@@ -127,6 +132,17 @@ const MapModule = {
             this.clickMarkers.removeLayer(layer);
             App.toast('标记已删除', 'success');
         }
+    },
+
+    // 添加地点搜索结果临时标记
+    addPlaceMarker(lat, lng, name) {
+        const marker = L.marker([lat, lng]).addTo(this.clickMarkers);
+        marker.bindPopup(`
+            <strong>${name}</strong><br>
+            坐标: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+            <small>(地点搜索结果)</small><br>
+            <button onclick="MapModule.removeClickMarker(this.closest('.leaflet-popup')._source._leaflet_id)" style="margin-top:4px;padding:2px 8px;background:#c0392b;color:white;border:none;border-radius:3px;cursor:pointer;">删除此标记</button>
+        `).openPopup();
     },
 
     // === 测距工具 ===
@@ -209,8 +225,10 @@ const MapModule = {
     },
 
     async calculateRoute() {
-        const startVal = document.getElementById('routeStart').value.trim();
-        const endVal = document.getElementById('routeEnd').value.trim();
+        const startInput = document.getElementById('routeStart');
+        const endInput = document.getElementById('routeEnd');
+        const startVal = startInput.value.trim();
+        const endVal = endInput.value.trim();
 
         if (!startVal || !endVal) {
             App.toast('请填写起点和终点', 'error');
@@ -219,16 +237,19 @@ const MapModule = {
 
         let startCoord, endCoord;
 
-        // 解析起点
-        if (startVal.includes(',')) {
+        // 优先使用搜索选中的坐标
+        if (startInput.dataset.lat) {
+            startCoord = [parseFloat(startInput.dataset.lat), parseFloat(startInput.dataset.lng)];
+        } else if (startVal.includes(',')) {
             const [lat, lng] = startVal.split(',').map(s => parseFloat(s.trim()));
             startCoord = [lat, lng];
         } else {
             startCoord = await this.geocode(startVal);
         }
 
-        // 解析终点
-        if (endVal.includes(',')) {
+        if (endInput.dataset.lat) {
+            endCoord = [parseFloat(endInput.dataset.lat), parseFloat(endInput.dataset.lng)];
+        } else if (endVal.includes(',')) {
             const [lat, lng] = endVal.split(',').map(s => parseFloat(s.trim()));
             endCoord = [lat, lng];
         } else {
@@ -236,7 +257,7 @@ const MapModule = {
         }
 
         if (!startCoord || !endCoord) {
-            App.toast('无法解析地址，请使用坐标格式：纬度,经度', 'error');
+            App.toast('无法解析地址，请使用搜索选择或坐标格式：纬度,经度', 'error');
             return;
         }
 
@@ -283,8 +304,14 @@ const MapModule = {
         }
         this.routePoints = [];
         this.measureLayer.clearLayers();
-        document.getElementById('routeStart').value = '';
-        document.getElementById('routeEnd').value = '';
+        const startInput = document.getElementById('routeStart');
+        const endInput = document.getElementById('routeEnd');
+        startInput.value = '';
+        endInput.value = '';
+        delete startInput.dataset.lat;
+        delete startInput.dataset.lng;
+        delete endInput.dataset.lat;
+        delete endInput.dataset.lng;
         document.getElementById('routeInfo').innerHTML = '';
         App.toast('路线已清除', 'success');
     },
@@ -301,6 +328,72 @@ const MapModule = {
             console.error('地理编码失败:', e);
         }
         return null;
+    },
+
+    // 地址搜索(返回多个结果)
+    async searchPlaces(query) {
+        if (!query || query.length < 2) return [];
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`);
+            const data = await res.json();
+            return data.map(item => ({
+                lat: parseFloat(item.lat),
+                lng: parseFloat(item.lon),
+                name: item.display_name,
+                shortName: item.name || item.display_name.split(',')[0]
+            }));
+        } catch (e) {
+            console.error('地址搜索失败:', e);
+            return [];
+        }
+    },
+
+    // 绑定路线起终点输入框的地址搜索
+    bindRouteSearch(inputId, suggestId, isStart) {
+        const input = document.getElementById(inputId);
+        const suggest = document.getElementById(suggestId);
+        let timer = null;
+
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const val = input.value.trim();
+            if (val.length < 2) {
+                suggest.innerHTML = '';
+                suggest.style.display = 'none';
+                return;
+            }
+            timer = setTimeout(async () => {
+                const places = await this.searchPlaces(val);
+                if (places.length === 0) {
+                    suggest.innerHTML = '';
+                    suggest.style.display = 'none';
+                    return;
+                }
+                suggest.innerHTML = places.map((p, i) => `
+                    <div class="route-suggestion-item" data-idx="${i}">${p.shortName}<br><small>${p.name}</small></div>
+                `).join('');
+                suggest.style.display = 'block';
+
+                suggest.querySelectorAll('.route-suggestion-item').forEach((item, i) => {
+                    item.addEventListener('click', () => {
+                        const place = places[i];
+                        input.value = place.shortName;
+                        input.dataset.lat = place.lat;
+                        input.dataset.lng = place.lng;
+                        suggest.innerHTML = '';
+                        suggest.style.display = 'none';
+                        this.flyTo(place.lat, place.lng, 14);
+                    });
+                });
+            }, 400);
+        });
+
+        // 点击外部隐藏建议
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !suggest.contains(e.target)) {
+                suggest.style.display = 'none';
+            }
+        });
     },
 
     // GPS定位
