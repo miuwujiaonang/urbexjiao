@@ -643,7 +643,7 @@ body {
 .detail-images {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
+    gap: 12px;
 }
 
 .detail-images img {
@@ -653,6 +653,45 @@ body {
     border-radius: 8px;
     cursor: pointer;
     border: 1px solid var(--border);
+}
+
+/* 单张图片容器(含上传者信息) */
+.detail-image-item {
+    background: var(--bg-dark);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.detail-image-item img {
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-image-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    font-size: 11px;
+}
+
+.img-uploader {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.img-time {
+    color: var(--text-muted);
+}
+
+.img-desc {
+    padding: 0 8px 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    word-break: break-all;
 }
 
 .detail-description {

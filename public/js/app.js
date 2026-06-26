@@ -630,7 +630,18 @@ const App = {
         if (ruin.images && ruin.images.length > 0) {
             imagesHtml = '<div class="detail-images">';
             ruin.images.forEach(img => {
-                imagesHtml += `<img src="${img.file_path}" onclick="window.open('${img.file_path}')" alt="${img.description || ''}" />`;
+                const uploader = img.username || '未知用户';
+                const time = img.uploaded_at ? new Date(img.uploaded_at).toLocaleDateString('zh-CN') : '';
+                imagesHtml += `
+                    <div class="detail-image-item">
+                        <img src="${img.file_path}" onclick="window.open('${img.file_path}')" alt="${img.description || ''}" />
+                        <div class="detail-image-meta">
+                            <span class="img-uploader">📷 ${this.escapeHtml(uploader)}</span>
+                            ${time ? `<span class="img-time">${time}</span>` : ''}
+                        </div>
+                        ${img.description ? `<div class="img-desc">${this.escapeHtml(img.description)}</div>` : ''}
+                    </div>
+                `;
             });
             imagesHtml += '</div>';
         } else {

@@ -15,11 +15,7 @@ router.post('/', auth, async (req, res) => {
         const ruinResult = await db.query('SELECT * FROM ruins WHERE id = $1', [ruin_id]);
         if (ruinResult.rows.length === 0) return res.status(404).json({ error: '废墟不存在' });
 
-        const existing = await db.query('SELECT id FROM reviews WHERE ruin_id = $1 AND user_id = $2', [ruin_id, req.user.id]);
-        if (existing.rows.length > 0) {
-            return res.status(400).json({ error: '您已评价过此废墟' });
-        }
-
+        // 允许同一用户多次评价同一废墟
         const result = await db.query(
             'INSERT INTO reviews (ruin_id, user_id, rating, content) VALUES ($1, $2, $3, $4) RETURNING id',
             [ruin_id, req.user.id, rating, content || null]
