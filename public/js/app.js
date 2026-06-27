@@ -654,7 +654,7 @@ const App = {
                 // 自己的评价或管理员可显示删除按钮
                 const canDelete = Auth.isLoggedIn() && (Auth.isAdmin() || r.user_id == Auth.user.id);
                 const deleteBtn = canDelete
-                    ? `<button class="btn btn-danger btn-sm review-delete-btn" onclick="App.deleteReview(${r.id}, ${id})">删除</button>`
+                    ? `<button class="btn btn-danger btn-sm review-delete-btn" onclick="App.deleteReview(${r.id}, ${ruin.id})">删除</button>`
                     : '';
                 return `
                 <div class="review-item">
