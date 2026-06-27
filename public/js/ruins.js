@@ -62,6 +62,17 @@ const Ruins = {
         return data.reviews;
     },
 
+    // 删除评价
+    async deleteReview(reviewId) {
+        const res = await fetch(`${API_BASE}/api/reviews/${reviewId}`, {
+            method: 'DELETE',
+            headers: Auth.getAuthHeader()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '删除失败');
+        return data;
+    },
+
     // 创建评价
     async createReview(ruinId, rating, content) {
         const res = await fetch(`${API_BASE}/api/reviews`, {

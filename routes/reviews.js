@@ -10,6 +10,9 @@ router.post('/', auth, async (req, res) => {
     if (!ruin_id || !rating || rating < 1 || rating > 5) {
         return res.status(400).json({ error: '废墟ID和评分(1-5)不能为空' });
     }
+    if (!content || !content.trim()) {
+        return res.status(400).json({ error: '评价内容不能为空' });
+    }
 
     try {
         const ruinResult = await db.query('SELECT * FROM ruins WHERE id = $1', [ruin_id]);
@@ -28,13 +31,17 @@ router.post('/', auth, async (req, res) => {
 });
 
 // 删除评价
+// 普通用户只能删除自己的评价; 管理员可删除所有评价
 router.delete('/:id', auth, async (req, res) => {
     const db = req.app.locals.db;
     try {
         const result = await db.query('SELECT * FROM reviews WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: '评价不存在' });
         const review = result.rows[0];
-        if (review.user_id !== req.user.id) return res.status(403).json({ error: '无权删除' });
+        // 非管理员且非本人, 无权删除
+        if (!req.user.is_admin && review.user_id != req.user.id) {
+            return res.status(403).json({ error: '无权删除该评价' });
+        }
 
         await db.query('DELETE FROM reviews WHERE id = $1', [req.params.id]);
         res.json({ message: '删除成功' });

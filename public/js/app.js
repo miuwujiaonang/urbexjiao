@@ -650,16 +650,26 @@ const App = {
 
         let reviewsHtml = '';
         if (reviews.length > 0) {
-            reviewsHtml = reviews.map(r => `
+            reviewsHtml = reviews.map(r => {
+                // 自己的评价或管理员可显示删除按钮
+                const canDelete = Auth.isLoggedIn() && (Auth.isAdmin() || r.user_id == Auth.user.id);
+                const deleteBtn = canDelete
+                    ? `<button class="btn btn-danger btn-sm review-delete-btn" onclick="App.deleteReview(${r.id}, ${id})">删除</button>`
+                    : '';
+                return `
                 <div class="review-item">
                     <div class="review-header">
-                        <span class="review-user">${r.username}</span>
+                        <span class="review-user">${this.escapeHtml(r.username)}</span>
                         <span class="review-rating">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
                     </div>
-                    <div class="review-content">${r.content || '未填写评价内容'}</div>
-                    <div class="review-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
+                    <div class="review-content">${this.escapeHtml(r.content || '未填写评价内容')}</div>
+                    <div class="review-footer">
+                        <span class="review-time">${new Date(r.created_at).toLocaleString('zh-CN')}</span>
+                        ${deleteBtn}
+                    </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         } else {
             reviewsHtml = '<p style="color:#999;">暂无评价</p>';
         }
@@ -807,9 +817,27 @@ const App = {
         const rating = parseInt(document.getElementById('reviewRating').value);
         const content = document.getElementById('reviewContent').value.trim();
 
+        if (!content) {
+            this.toast('评价内容不能为空', 'error');
+            return;
+        }
+
         try {
             await Ruins.createReview(ruinId, rating, content);
             this.toast('评价成功！', 'success');
+            this.showDetail(ruinId);
+            await this.loadRuins();
+        } catch (err) {
+            this.toast(err.message, 'error');
+        }
+    },
+
+    // 删除评价(自己的或管理员删除任意)
+    async deleteReview(reviewId, ruinId) {
+        if (!confirm('确定要删除这条评价吗？')) return;
+        try {
+            await Ruins.deleteReview(reviewId);
+            this.toast('评价已删除', 'success');
             this.showDetail(ruinId);
             await this.loadRuins();
         } catch (err) {

@@ -749,10 +749,23 @@ body {
     line-height: 1.6;
 }
 
+.review-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+}
+
 .review-time {
     color: var(--text-muted);
     font-size: 12px;
-    margin-top: 6px;
+}
+
+/* 小尺寸按钮(用于评价删除等) */
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 4px;
 }
 
 /* === Toast 提示 === */
