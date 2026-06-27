@@ -318,6 +318,20 @@ const MapModule = {
 
     // 地理编码（地址转坐标）
     async geocode(address) {
+        // 优先使用高德(国内精度高, 支持具体建筑)
+        if (typeof AMAP_KEY !== 'undefined' && AMAP_KEY) {
+            try {
+                const res = await fetch(`https://restapi.amap.com/v3/geocode/geo?key=${AMAP_KEY}&address=${encodeURIComponent(address)}`);
+                const data = await res.json();
+                if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+                    const loc = data.geocodes[0].location.split(',');
+                    return [parseFloat(loc[1]), parseFloat(loc[0])];
+                }
+            } catch (e) {
+                console.error('高德地理编码失败:', e);
+            }
+        }
+        // 退回 Nominatim
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
             const data = await res.json();
@@ -330,9 +344,32 @@ const MapModule = {
         return null;
     },
 
-    // 地址搜索(返回多个结果)
+    // 地址搜索(返回多个结果, 支持具体建筑/POI)
     async searchPlaces(query) {
         if (!query || query.length < 2) return [];
+        // 优先使用高德 POI 搜索(能搜建筑、设施、商铺、景点等)
+        if (typeof AMAP_KEY !== 'undefined' && AMAP_KEY) {
+            try {
+                const res = await fetch(`https://restapi.amap.com/v3/place/text?key=${AMAP_KEY}&keywords=${encodeURIComponent(query)}&offset=8&page=1&extensions=base`);
+                const data = await res.json();
+                if (data.status === '1' && data.pois) {
+                    return data.pois
+                        .filter(p => p.location)
+                        .map(p => {
+                            const loc = p.location.split(',');
+                            return {
+                                lat: parseFloat(loc[1]),
+                                lng: parseFloat(loc[0]),
+                                name: `${p.name}${p.address ? ' (' + p.address + ')' : ''}`,
+                                shortName: p.name
+                            };
+                        });
+                }
+            } catch (e) {
+                console.error('高德搜索失败:', e);
+            }
+        }
+        // 退回 Nominatim
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`);
             const data = await res.json();

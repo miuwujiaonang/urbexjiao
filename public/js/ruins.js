@@ -79,16 +79,71 @@ const Ruins = {
 
     // 上传图片
     async uploadImage(file) {
+        // 先压缩图片, 避免手机拍照文件过大触发 Netlify Functions 请求体限制
+        const compressed = await this.compressImage(file, 1920, 0.85);
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('image', compressed, file.name.replace(/\.[^.]+$/, '.jpg'));
         const res = await fetch(`${API_BASE}/api/upload`, {
             method: 'POST',
             headers: Auth.getAuthHeader(),
             body: formData
         });
-        const data = await res.json();
+        // 优先按 JSON 解析; 失败时显示原始文本(避免 "Unexpected token" 错误)
+        let data;
+        const text = await res.text();
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('上传失败(服务器返回非JSON): ' + text.slice(0, 100));
+        }
         if (!res.ok) throw new Error(data.error || '上传失败');
         return data.path;
+    },
+
+    // 压缩图片(canvas 重绘)
+    // maxSize: 最长边像素; quality: 0~1
+    compressImage(file, maxSize, quality) {
+        return new Promise((resolve, reject) => {
+            if (!file.type.startsWith('image/')) {
+                resolve(file);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > height && width > maxSize) {
+                        height = Math.round(height * maxSize / width);
+                        width = maxSize;
+                    } else if (height > maxSize) {
+                        width = Math.round(width * maxSize / height);
+                        height = maxSize;
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            resolve(file);
+                            return;
+                        }
+                        // 如果压缩后反而更大, 用原文件
+                        if (blob.size >= file.size) {
+                            resolve(file);
+                        } else {
+                            resolve(blob);
+                        }
+                    }, 'image/jpeg', quality);
+                };
+                img.onerror = () => resolve(file);
+                img.src = e.target.result;
+            };
+            reader.onerror = () => resolve(file);
+            reader.readAsDataURL(file);
+        });
     },
 
     // 在地图上显示所有废墟
